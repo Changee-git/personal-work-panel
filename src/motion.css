@@ -1,0 +1,319 @@
+/*
+ * Motion layer
+ *
+ * The timing curves follow Ant Design's transition guidance while keeping the
+ * visual language specific to this focused desktop workspace. Animations use
+ * opacity and compositor-friendly transforms so interaction is never blocked.
+ */
+:root {
+  --motion-duration-fast: 120ms;
+  --motion-duration-base: 200ms;
+  --motion-duration-slow: 320ms;
+  --motion-ease-standard: cubic-bezier(0.645, 0.045, 0.355, 1);
+  --motion-ease-enter: cubic-bezier(0.08, 0.82, 0.17, 1);
+  --motion-ease-emphasis: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Navigation and primary view changes */
+.view {
+  animation: motion-view-enter var(--motion-duration-slow) var(--motion-ease-enter) backwards;
+}
+
+.primary-nav button,
+.chrome-button,
+.icon-button,
+.segmented button,
+.project-picker label,
+.add-row,
+.today-todo,
+.work-item,
+.issue-heading,
+.summary-toggle,
+.search-box,
+.toggle-switch,
+.toggle-switch i {
+  transition-duration: var(--motion-duration-base);
+  transition-timing-function: var(--motion-ease-standard);
+}
+
+.primary-nav button:active,
+.chrome-button:active,
+.icon-button:active,
+.primary-button:active,
+.ghost-button:active,
+.finish-button:active,
+.text-button:active,
+.back-button:active,
+.add-row:active,
+.today-todo:active {
+  transform: scale(.97);
+  transition-duration: var(--motion-duration-fast);
+}
+
+.primary-nav button.active svg {
+  animation: motion-nav-icon var(--motion-duration-base) var(--motion-ease-enter);
+}
+
+.primary-nav button i {
+  transform-origin: center;
+  animation: motion-indicator-enter var(--motion-duration-base) var(--motion-ease-enter) backwards;
+}
+
+.brand-mark {
+  animation: motion-brand-settle 460ms var(--motion-ease-enter) backwards;
+}
+
+/* Lists and cards enter as a connected sequence instead of appearing abruptly. */
+.project-card,
+.idea-card,
+.today-group,
+.work-list > .work-item,
+.work-list > .issue-row,
+.project-picker label,
+.settings-list > .setting-row,
+.image-strip figure {
+  animation: motion-item-enter var(--motion-duration-slow) var(--motion-ease-emphasis) backwards;
+}
+
+.project-grid > :nth-child(2),
+.idea-grid > :nth-child(2),
+.today-groups > :nth-child(2),
+.settings-list > :nth-child(2),
+.project-picker > :nth-child(2) { animation-delay: 35ms; }
+.project-grid > :nth-child(3),
+.idea-grid > :nth-child(3),
+.today-groups > :nth-child(3),
+.settings-list > :nth-child(3),
+.project-picker > :nth-child(3) { animation-delay: 70ms; }
+.project-grid > :nth-child(4),
+.idea-grid > :nth-child(4),
+.today-groups > :nth-child(4),
+.settings-list > :nth-child(4),
+.project-picker > :nth-child(4) { animation-delay: 105ms; }
+.project-grid > :nth-child(5),
+.idea-grid > :nth-child(5),
+.today-groups > :nth-child(5),
+.project-picker > :nth-child(5) { animation-delay: 140ms; }
+.project-grid > :nth-child(n + 6),
+.idea-grid > :nth-child(n + 6),
+.today-groups > :nth-child(n + 6),
+.project-picker > :nth-child(n + 6) { animation-delay: 165ms; }
+
+.project-card,
+.today-group,
+.idea-card,
+.work-panel,
+.summary-panel,
+.setting-row {
+  transition-property: transform, translate, border-color, background-color, box-shadow, opacity;
+  transition-duration: var(--motion-duration-base);
+  transition-timing-function: var(--motion-ease-standard);
+}
+
+.project-card:hover {
+  translate: 0 -1px;
+}
+
+.project-card > footer > svg,
+.todo-arrow,
+.summary-toggle > svg,
+.issue-heading > svg:first-child {
+  transition: transform var(--motion-duration-base) var(--motion-ease-enter), opacity var(--motion-duration-base) ease;
+}
+
+.project-card:hover > footer > svg,
+.today-todo:hover .todo-arrow,
+.summary-toggle:hover > svg {
+  transform: translateX(3px);
+}
+
+/* Completion is the signature interaction: quick confirmation, then calm. */
+.check-box {
+  position: relative;
+  transition: border-color var(--motion-duration-base) var(--motion-ease-standard),
+    background-color var(--motion-duration-base) var(--motion-ease-standard),
+    box-shadow var(--motion-duration-base) var(--motion-ease-standard),
+    transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.check-box:active {
+  transform: scale(.88);
+}
+
+.is-done > .check-box,
+.today-todo.is-done .check-box {
+  border-color: rgba(102, 210, 176, .7);
+  background: rgba(102, 210, 176, .14);
+  box-shadow: 0 0 0 3px rgba(102, 210, 176, .06);
+}
+
+.check-box svg,
+.picker-check svg {
+  transform-origin: center;
+  animation: motion-check-enter 260ms var(--motion-ease-enter) backwards;
+}
+
+.today-todo .todo-content,
+.work-item .item-main {
+  transition: opacity var(--motion-duration-base) ease, color var(--motion-duration-base) ease;
+}
+
+.active-dot {
+  animation: motion-active-pulse 2.8s ease-in-out infinite;
+}
+
+/* Modal, disclosure and feedback motion */
+.modal-backdrop {
+  animation: motion-backdrop-enter var(--motion-duration-base) ease-out backwards;
+}
+
+.modal,
+.completion-card {
+  transform-origin: 50% 42%;
+  animation: motion-dialog-enter var(--motion-duration-slow) var(--motion-ease-enter) backwards;
+}
+
+.inline-editor,
+.issue-detail,
+.summary-editor,
+.completion-editor,
+.notice,
+.empty-state,
+.finish-bar {
+  animation: motion-panel-enter var(--motion-duration-slow) var(--motion-ease-emphasis) backwards;
+}
+
+.completion-mark {
+  position: relative;
+  animation: motion-completion-mark 440ms var(--motion-ease-enter) 90ms backwards;
+}
+
+.completion-mark::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid rgba(123, 231, 204, .62);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: motion-completion-ring 700ms var(--motion-ease-emphasis) 180ms both;
+}
+
+.notice:hover {
+  translate: 0 -1px;
+  border-color: rgba(99, 199, 176, .34);
+}
+
+/* Controls respond immediately without decorative bouncing. */
+.primary-button,
+.ghost-button,
+.finish-button,
+.text-button,
+.back-button {
+  transition-property: transform, translate, filter, color, background-color, border-color, box-shadow;
+  transition-duration: var(--motion-duration-base);
+  transition-timing-function: var(--motion-ease-standard);
+}
+
+.ghost-button:hover,
+.finish-button:hover,
+.add-row:hover {
+  translate: 0 -1px;
+}
+
+.icon-button:hover svg,
+.chrome-button:hover svg,
+.primary-button:hover svg,
+.finish-button:hover svg {
+  transform: scale(1.06);
+  transition: transform var(--motion-duration-fast) var(--motion-ease-enter);
+}
+
+.search-box:focus-within {
+  color: var(--accent);
+  border-color: var(--line-bright);
+  box-shadow: 0 7px 18px rgba(27, 101, 166, .08);
+}
+
+.segmented button.active {
+  box-shadow: inset 0 0 0 1px rgba(93, 175, 252, .11);
+}
+
+input,
+textarea {
+  transition: border-color var(--motion-duration-base) var(--motion-ease-standard),
+    background-color var(--motion-duration-base) var(--motion-ease-standard),
+    box-shadow var(--motion-duration-base) var(--motion-ease-standard);
+}
+
+@keyframes motion-view-enter {
+  from { opacity: 0; translate: 0 9px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+@keyframes motion-item-enter {
+  from { opacity: 0; translate: 0 7px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+@keyframes motion-panel-enter {
+  from { opacity: 0; translate: 0 -5px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+@keyframes motion-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes motion-dialog-enter {
+  from { opacity: 0; transform: translateY(10px) scale(.975); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes motion-check-enter {
+  from { opacity: 0; transform: scale(.45) rotate(-18deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes motion-completion-mark {
+  from { opacity: 0; transform: scale(.68) rotate(-8deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes motion-completion-ring {
+  0% { opacity: .7; transform: scale(.82); }
+  100% { opacity: 0; transform: scale(1.65); }
+}
+
+@keyframes motion-nav-icon {
+  from { opacity: .35; transform: scale(.78); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes motion-indicator-enter {
+  from { opacity: 0; transform: scaleY(.25); }
+  to { opacity: 1; transform: scaleY(1); }
+}
+
+@keyframes motion-brand-settle {
+  from { opacity: 0; transform: translateY(-5px) scale(.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes motion-active-pulse {
+  0%, 100% { opacity: .68; box-shadow: 0 0 7px rgba(85, 173, 255, .42); }
+  50% { opacity: 1; box-shadow: 0 0 14px rgba(85, 173, 255, .82); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    transition-delay: 0ms !important;
+  }
+}
