@@ -1,0 +1,33 @@
+# JavaScript / TypeScript
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# Environment and local settings
+.env
+.env.*
+!.env.example
+*.local
+*.log
+.vite-preview.*
+
+# IDE / operating system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local installers and release artifacts
+/*.exe
+/发布版/
+*.pdb
+*.msi
+*.msix
+*.app
+*.deb
+*.rpm
