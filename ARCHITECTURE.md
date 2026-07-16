@@ -33,7 +33,7 @@ flowchart LR
   UI["React 视图组件"] --> Store["Zustand 状态与业务规则"]
   Store --> Backend["src/lib/backend.ts"]
   Backend -->|"Tauri invoke"| Commands["Rust Commands"]
-  Commands --> Storage["本地 JSON / 图片 / 备份 / Markdown"]
+  Commands --> Storage["本地 JSON / 图片 / Markdown"]
   Tray["系统托盘"] --> Window["窗口显示与隐藏"]
   Shortcut["全局快捷键"] --> Window
   Window --> UI
@@ -49,10 +49,11 @@ flowchart LR
 | `src/components/IdeasView.tsx` | 灵感记录 |
 | src/components/ProjectsView.tsx | 项目列表、筛选和统计 |
 | src/components/EditableTaskName.tsx | 进行中项目名称的原地编辑、输入验证和键盘交互 |
-| `src/components/TaskDetail.tsx` | Todo、Issue、总结、完成与导出 |
+| `src/components/TaskDetail.tsx` | Todo、Issue、总结、完成与单项目导出 |
+| `src/components/MarkdownExportSettings.tsx` | 导出项目多选、默认/自定义路径与导出反馈 |
 | `src/store.ts` | 状态模型、序号规则、业务操作、持久化触发 |
 | `src/lib/backend.ts` | 浏览器测试替身与 Tauri invoke 适配 |
-| `src-tauri/src/lib.rs` | 文件存储、备份、图片、导出、托盘、窗口、快捷键、自启动 |
+| `src-tauri/src/lib.rs` | 文件存储、恢复副本、图片、Markdown 序列化与批量导出、托盘、窗口、快捷键、自启动 |
 | `src-tauri/src/main.rs` | 原生进程入口和 Windows 子系统声明 |
 
 ## 5. 数据流
@@ -62,7 +63,7 @@ flowchart LR
 3. 状态变化通过 `save_database` 序列化到 Rust 后端。
 4. Rust 使用临时文件写入并替换主文件，保留可恢复备份。
 5. 图片由 Rust 复制至应用数据目录，前端只保存本地路径。
-6. Markdown 导出由 Rust 创建导出目录、复制资源并写入相对引用。
+6. Markdown 导出前先等待保存队列；Rust 按所选项目创建独立文件、复制资源并写入相对引用。默认目标为应用/项目根目录下的 `export`，用户也可通过系统目录选择器传入自定义绝对路径。
 
 核心实体：`Task`、`Todo`、`Issue`、`Idea`、`Settings`、持久化自增 `Counters`。时间使用 ISO 8601 字符串。
 
@@ -91,8 +92,9 @@ flowchart LR
 - 未引入动画框架。替代方案 Framer Motion 更适合复杂退出动画和手势编排，但当前需求可由 CSS 完成，引入后会增加包体、API 和维护成本。
 ## 8. 权限与安全边界
 
-- 应用仅访问自身应用数据目录以及用户通过系统对话框选择的备份/导出目标。
+- 应用仅访问自身应用数据目录、应用根目录下的默认 `export`，以及用户通过系统对话框选择的自定义导出目标。
 - Tauri capability 控制前端可调用能力。
+- 批量导出命令拒绝空项目列表与相对路径，文件名会替换 Windows 保留字符；目录写入失败会返回明确错误。
 - 无网络后端、无登录、无密钥。
 - 图片和 JSON 均留在本机。
 - 发布 EXE 未签名时可能触发 SmartScreen；正式分发可增加代码签名证书。
@@ -112,8 +114,8 @@ flowchart LR
 
 ## 11. 开源发布与供应链
 
-- 源码仓库只跟踪前端、Rust/Tauri 源码、锁文件、图标、测试、脚本与文档。Node/Rust 构建目录、开发机安装程序、日志、调试符号、本地环境文件和 EXE 均由 `.gitignore` 排除。
+- 源码仓库只跟踪前端、Rust/Tauri 源码、锁文件、图标、验证脚本与文档。Node/Rust 构建目录、开发机安装程序、日志、调试符号、本地环境文件和 EXE 均由 `.gitignore` 排除。
 - 可执行成品通过 GitHub Releases 作为版本资产分发，避免二进制混入源码历史；版本号在 `package.json`、`package-lock.json`、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock` 与 `src-tauri/tauri.conf.json` 中保持一致。
-- 每次发布前依次执行前端测试、TypeScript/Vite 构建、`cargo check`、Tauri Release 构建和 Windows PE 子系统校验。
+- 每次发布前依次执行 TypeScript/Vite 生产构建、Rust 格式检查、Tauri Release 构建和 Windows PE 子系统校验。
 - 发布截图只能使用虚构演示数据；禁止上传应用数据目录、备份、真实粘贴图片、密钥、个人绝对路径或系统日志。
 - npm 与 Cargo 锁文件纳入版本控制，确保依赖解析可追踪。未来升级依赖时需在变更记录中说明用途、替代方案和维护影响。

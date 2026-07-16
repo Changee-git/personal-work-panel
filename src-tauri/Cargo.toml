@@ -1,6 +1,6 @@
 [package]
 name = "personal-work-panel"
-version = "1.1.0"
+version = "1.2.0"
 description = "A local-first personal work panel"
 authors = ["Personal Work Panel"]
 edition = "2021"

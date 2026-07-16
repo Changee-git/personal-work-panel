@@ -1,6 +1,7 @@
 import { convertFileSrc, invoke, isTauri } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
+import { open } from '@tauri-apps/plugin-dialog';
 import type { AppDatabase, WindowMode } from '../types';
 import { emptyDatabase } from '../types';
 
@@ -45,11 +46,6 @@ export async function setAutostartEnabled(enabled: boolean): Promise<void> {
   else await disable();
 }
 
-export async function createDataBackup(): Promise<string> {
-  if (isTauri()) return invoke<string>('create_backup');
-  throw new Error('浏览器预览模式不支持创建本地备份，请在桌面应用中使用。');
-}
-
 export async function listenForWindowShown(handler: () => void): Promise<UnlistenFn> {
   if (!isTauri()) return () => undefined;
   return listen('window-shown', handler);
@@ -72,9 +68,46 @@ export async function saveClipboardImage(file: File): Promise<string> {
   return URL.createObjectURL(file);
 }
 
-export async function exportTask(taskId: string): Promise<string> {
-  if (isTauri()) return invoke<string>('export_task_markdown', { taskId });
+export interface MarkdownExportResult {
+  directory: string;
+  fileCount: number;
+  files: string[];
+}
+
+export async function getDefaultExportDirectory(): Promise<string> {
+  if (isTauri()) return invoke<string>('get_default_export_directory');
+  return '项目根目录\\export';
+}
+
+export async function chooseMarkdownExportDirectory(defaultPath: string): Promise<string | null> {
+  if (!isTauri()) return null;
+  const selected = await open({
+    title: '选择 Markdown 导出文件夹',
+    directory: true,
+    multiple: false,
+    defaultPath
+  });
+  return typeof selected === 'string' ? selected : null;
+}
+
+export async function exportProjectsMarkdown(
+  taskIds: string[],
+  targetDirectory?: string
+): Promise<MarkdownExportResult> {
+  if (isTauri()) {
+    return invoke<MarkdownExportResult>('export_projects_markdown', {
+      taskIds,
+      targetDirectory: targetDirectory || null
+    });
+  }
   throw new Error('浏览器预览模式不支持写入导出文件，请在桌面应用中使用。');
+}
+
+export async function exportTask(taskId: string): Promise<string> {
+  const result = await exportProjectsMarkdown([taskId]);
+  const output = result.files[0];
+  if (!output) throw new Error('项目未生成 Markdown 文件。');
+  return output;
 }
 
 export function imageSource(path: string): string {

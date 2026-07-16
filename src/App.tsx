@@ -3,7 +3,6 @@ import {
   Brain,
   ChevronDown,
   ChevronUp,
-  DatabaseBackup,
   FolderKanban,
   Minus,
   PanelTop,
@@ -19,6 +18,7 @@ import { IdeasView } from './components/IdeasView';
 import { ProjectsView } from './components/ProjectsView';
 import { TodayFinishedModal, TodayView } from './components/TodayView';
 import { Modal } from './components/Common';
+import { MarkdownExportSettings } from './components/MarkdownExportSettings';
 import './styles.css';
 import './motion.css';
 
@@ -137,9 +137,8 @@ export default function App() {
 }
 
 function SystemSettings({ onClose }: { onClose: () => void }) {
-  const { db, setAutostart, backupNow } = useAppStore();
+  const { db, setAutostart } = useAppStore();
   const [autostartBusy, setAutostartBusy] = useState(false);
-  const [backupBusy, setBackupBusy] = useState(false);
   const [message, setMessage] = useState('');
 
   const toggleAutostart = async () => {
@@ -154,20 +153,7 @@ function SystemSettings({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const createBackup = async () => {
-    setBackupBusy(true);
-    setMessage('');
-    try {
-      const path = await backupNow();
-      setMessage(`备份已创建：${path}`);
-    } catch (error) {
-      setMessage(`创建备份失败：${String(error)}`);
-    } finally {
-      setBackupBusy(false);
-    }
-  };
-
-  return <Modal title="应用设置" onClose={onClose}>
+  return <Modal title="应用设置" onClose={onClose} wide>
     <div className="settings-list">
       <section className="setting-row">
         <div className="setting-icon"><Power size={18} /></div>
@@ -185,22 +171,8 @@ function SystemSettings({ onClose }: { onClose: () => void }) {
           onClick={() => void toggleAutostart()}
         ><i /></button>
       </section>
-      <section className="setting-row backup-row">
-        <div className="setting-icon"><DatabaseBackup size={18} /></div>
-        <div className="setting-copy">
-          <strong>数据备份</strong>
-          <span>备份项目、待办、问题、灵感和所有本地配图；自动保留最近 10 份。</span>
-        </div>
-        <button
-          className="ghost-button"
-          disabled={backupBusy}
-          onClick={() => void createBackup()}
-        >
-          <DatabaseBackup size={15} />
-          {backupBusy ? '备份中…' : '立即备份'}
-        </button>
-      </section>
-      {message && <p className="settings-message" role="status">{message}</p>}
+      {message && <p className="settings-message error" role="status">{message}</p>}
+      <MarkdownExportSettings />
     </div>
     <footer className="modal-actions">
       <button className="primary-button" onClick={onClose}>完成</button>

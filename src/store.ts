@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import type { AppDatabase, AppTab, Idea, Issue, Task, Todo, WindowMode } from './types';
 import { emptyDatabase, nowIso, uid } from './types';
 import {
-  createDataBackup,
   loadDatabase,
   readAutostartEnabled,
   saveDatabase,
@@ -29,7 +28,6 @@ interface Store {
   handleWindowShown: () => void;
   setWindowMode: (mode: WindowMode) => Promise<void>;
   setAutostart: (enabled: boolean) => Promise<void>;
-  backupNow: () => Promise<string>;
   createTask: (name: string) => void;
   renameTask: (id: string, name: string) => void;
   deleteTask: (id: string) => void;
@@ -152,10 +150,6 @@ export const useAppStore = create<Store>((set, get) => ({
     });
   },
 
-  backupNow: async () => {
-    await flushPendingSaves();
-    return createDataBackup();
-  },
 
   createTask: (name) => set((state) => {
     const timestamp = nowIso();

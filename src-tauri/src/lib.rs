@@ -1,7 +1,7 @@
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
 };
@@ -274,57 +274,6 @@ fn save_image(app: AppHandle, data_base64: String, mime_type: String) -> Result<
     Ok(path.to_string_lossy().into_owned())
 }
 
-fn copy_directory(source: &Path, target: &Path) -> Result<(), String> {
-    fs::create_dir_all(target).map_err(|error| error.to_string())?;
-    for entry in fs::read_dir(source).map_err(|error| error.to_string())? {
-        let entry = entry.map_err(|error| error.to_string())?;
-        let source_path = entry.path();
-        let target_path = target.join(entry.file_name());
-        if source_path.is_dir() {
-            copy_directory(&source_path, &target_path)?;
-        } else if source_path.is_file() {
-            fs::copy(&source_path, &target_path).map_err(|error| error.to_string())?;
-        }
-    }
-    Ok(())
-}
-
-#[tauri::command]
-fn create_backup(app: AppHandle) -> Result<String, String> {
-    let root = data_dir(&app)?;
-    let database = database_path(&app)?;
-    if !database.exists() {
-        return Err("尚无可备份的数据，请先创建或保存一项内容。".into());
-    }
-
-    let backups = root.join("backups");
-    fs::create_dir_all(&backups).map_err(|error| error.to_string())?;
-    let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
-    let suffix = uuid::Uuid::new_v4().simple().to_string();
-    let target = backups.join(format!("{}-{}", stamp, &suffix[..8]));
-    fs::create_dir_all(&target).map_err(|error| error.to_string())?;
-    fs::copy(&database, target.join("work-panel.json")).map_err(|error| error.to_string())?;
-
-    let images = root.join("images");
-    if images.exists() {
-        copy_directory(&images, &target.join("images"))?;
-    }
-
-    let mut saved: Vec<PathBuf> = fs::read_dir(&backups)
-        .map_err(|error| error.to_string())?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.is_dir())
-        .collect();
-    saved.sort();
-    let stale_count = saved.len().saturating_sub(10);
-    for stale in saved.into_iter().take(stale_count) {
-        fs::remove_dir_all(stale).map_err(|error| error.to_string())?;
-    }
-
-    Ok(target.to_string_lossy().into_owned())
-}
-
 fn safe_name(value: &str) -> String {
     let invalid = ['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
     value
@@ -362,14 +311,47 @@ fn copy_images(paths: &[String], resource_dir: &Path) -> Result<Vec<String>, Str
     Ok(relative)
 }
 
+fn project_root() -> Result<PathBuf, String> {
+    if let Ok(current) = std::env::current_dir() {
+        if current.join("package.json").is_file() && current.join("src-tauri").is_dir() {
+            return Ok(current);
+        }
+    }
+
+    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+    let executable_dir = executable.parent().ok_or("无法确定应用所在目录")?;
+    for ancestor in executable_dir.ancestors() {
+        if ancestor.file_name().and_then(|name| name.to_str()) == Some("src-tauri")
+            && ancestor.join("tauri.conf.json").is_file()
+        {
+            return ancestor
+                .parent()
+                .map(Path::to_path_buf)
+                .ok_or_else(|| "无法确定项目根目录".to_string());
+        }
+    }
+
+    Ok(executable_dir.to_path_buf())
+}
+
+fn default_export_directory() -> Result<PathBuf, String> {
+    Ok(project_root()?.join("export"))
+}
+
 #[tauri::command]
-fn export_task_markdown(app: AppHandle, task_id: String) -> Result<String, String> {
-    let database = load_database(app.clone())?;
-    let task = database
-        .tasks
-        .iter()
-        .find(|task| task.id == task_id)
-        .ok_or("项目不存在")?;
+fn get_default_export_directory() -> Result<String, String> {
+    Ok(default_export_directory()?.to_string_lossy().into_owned())
+}
+
+fn todo_completion_marker(status: &str) -> &'static str {
+    if status == "done" {
+        "√"
+    } else {
+        " "
+    }
+}
+
+fn task_export_base(task: &Task) -> String {
     let date = task
         .completed_at
         .as_deref()
@@ -377,22 +359,34 @@ fn export_task_markdown(app: AppHandle, task_id: String) -> Result<String, Strin
         .chars()
         .take(10)
         .collect::<String>();
-    let base = format!("{:02}_{}_{}", task.task_no, safe_name(&task.name), date);
-    let exports = data_dir(&app)?.join("exports");
-    fs::create_dir_all(&exports).map_err(|error| error.to_string())?;
-    let resources = exports.join(format!("{}_assets", base));
+    let name = safe_name(&task.name);
+    format!(
+        "{:02}_{}_{}",
+        task.task_no,
+        if name.is_empty() { "project" } else { &name },
+        date
+    )
+}
+
+fn export_project_markdown(
+    database: &AppDatabase,
+    task: &Task,
+    target_directory: &Path,
+) -> Result<PathBuf, String> {
+    let base = task_export_base(task);
+    let resources = target_directory.join(format!("{}_assets", base));
     fs::create_dir_all(&resources).map_err(|error| error.to_string())?;
 
     let summary_images = copy_images(&task.summary_images, &resources)?;
     let mut markdown = format!(
-    "# {}\n\n- 项目序号: No.{:02}\n- 创建时间: {}\n- 最近推进: {}\n- 完成时间: {}\n\n## 项目总结\n\n{}\n\n",
-    task.name,
-    task.task_no,
-    task.created_at,
-    task.last_progress_at,
-    task.completed_at.as_deref().unwrap_or("—"),
-    if task.summary.is_empty() { "暂无总结" } else { &task.summary }
-  );
+        "# {}\n\n- 项目序号: No.{:02}\n- 创建时间: {}\n- 最近推进: {}\n- 完成时间: {}\n\n## 项目总结\n\n{}\n\n",
+        task.name,
+        task.task_no,
+        task.created_at,
+        task.last_progress_at,
+        task.completed_at.as_deref().unwrap_or("—"),
+        if task.summary.is_empty() { "暂无总结" } else { &task.summary }
+    );
     for path in summary_images {
         markdown.push_str(&format!("![]({})\n\n", path));
     }
@@ -411,7 +405,7 @@ fn export_task_markdown(app: AppHandle, task_id: String) -> Result<String, Strin
     for todo in todos {
         markdown.push_str(&format!(
             "- [{}] {:02}. {}\n",
-            if todo.status == "done" { "x" } else { " " },
+            todo_completion_marker(&todo.status),
             todo.todo_no,
             todo.content
         ));
@@ -441,9 +435,91 @@ fn export_task_markdown(app: AppHandle, task_id: String) -> Result<String, Strin
         }
     }
 
-    let output = exports.join(format!("{}.md", base));
+    let output = target_directory.join(format!("{}.md", base));
     atomic_write(&output, markdown.as_bytes())?;
-    Ok(output.to_string_lossy().into_owned())
+    Ok(output)
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MarkdownExportResult {
+    directory: String,
+    file_count: usize,
+    files: Vec<String>,
+}
+
+fn resolve_export_directory(target_directory: Option<String>) -> Result<PathBuf, String> {
+    let target = match target_directory {
+        Some(value) if !value.trim().is_empty() => PathBuf::from(value),
+        _ => default_export_directory()?,
+    };
+    if !target.is_absolute() {
+        return Err("导出路径必须是绝对路径".into());
+    }
+    fs::create_dir_all(&target).map_err(|error| format!("无法创建导出目录: {error}"))?;
+    Ok(target)
+}
+
+#[tauri::command]
+fn export_projects_markdown(
+    app: AppHandle,
+    task_ids: Vec<String>,
+    target_directory: Option<String>,
+) -> Result<MarkdownExportResult, String> {
+    if task_ids.is_empty() {
+        return Err("请至少选择一个要导出的项目".into());
+    }
+
+    let database = load_database(app)?;
+    let target = resolve_export_directory(target_directory)?;
+    let mut seen = HashSet::new();
+    let mut files = Vec::new();
+
+    for task_id in task_ids {
+        if !seen.insert(task_id.clone()) {
+            continue;
+        }
+        let task = database
+            .tasks
+            .iter()
+            .find(|task| task.id == task_id)
+            .ok_or_else(|| format!("项目不存在: {task_id}"))?;
+        let output = export_project_markdown(&database, task, &target)?;
+        files.push(output.to_string_lossy().into_owned());
+    }
+
+    Ok(MarkdownExportResult {
+        directory: target.to_string_lossy().into_owned(),
+        file_count: files.len(),
+        files,
+    })
+}
+
+#[tauri::command]
+fn export_task_markdown(app: AppHandle, task_id: String) -> Result<String, String> {
+    let result = export_projects_markdown(app, vec![task_id], None)?;
+    result
+        .files
+        .into_iter()
+        .next()
+        .ok_or_else(|| "项目未生成 Markdown 文件".to_string())
+}
+
+#[cfg(test)]
+mod markdown_export_tests {
+    use super::{safe_name, todo_completion_marker};
+
+    #[test]
+    fn completed_todo_uses_check_mark_instead_of_x() {
+        assert_eq!(todo_completion_marker("done"), "√");
+        assert_ne!(todo_completion_marker("done"), "x");
+        assert_eq!(todo_completion_marker("open"), " ");
+    }
+
+    #[test]
+    fn export_file_name_removes_windows_reserved_characters() {
+        assert_eq!(safe_name("计划:第一阶段/验收?"), "计划_第一阶段_验收_");
+    }
 }
 
 fn show_window<R: Runtime>(app: &AppHandle<R>) {
@@ -530,7 +606,8 @@ pub fn run() {
             quit_app,
             set_window_mode,
             save_image,
-            create_backup,
+            get_default_export_directory,
+            export_projects_markdown,
             export_task_markdown
         ])
         .run(tauri::generate_context!())
