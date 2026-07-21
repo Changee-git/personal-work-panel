@@ -71,6 +71,25 @@ const progressed = (tasks: Task[], taskId: string, timestamp = nowIso()) =>
 const todoIdsForTask = (db: AppDatabase, taskId: string) =>
   new Set(db.todos.filter((todo) => todo.task_id === taskId).map((todo) => todo.id));
 
+/** 将项目序号整理为连续 1..n，并同步 next_task_no */
+const normalizeTaskNumbers = (db: AppDatabase): AppDatabase => {
+  const ordered = [...db.tasks].sort((left, right) => left.task_no - right.task_no);
+  let changed = ordered.length !== db.tasks.length;
+  const tasks = ordered.map((task, index) => {
+    const taskNo = index + 1;
+    if (task.task_no !== taskNo) changed = true;
+    return task.task_no === taskNo ? task : { ...task, task_no: taskNo };
+  });
+  const nextTaskNo = tasks.length + 1;
+  if (db.counters.next_task_no !== nextTaskNo) changed = true;
+  if (!changed) return db;
+  return {
+    ...db,
+    counters: { ...db.counters, next_task_no: nextTaskNo },
+    tasks
+  };
+};
+
 export const useAppStore = create<Store>((set, get) => ({
   db: emptyDatabase(),
   ready: false,
@@ -84,12 +103,14 @@ export const useAppStore = create<Store>((set, get) => ({
   initialize: async () => {
     const loaded = await loadDatabase();
     const nativeAutostart = await readAutostartEnabled().catch(() => null);
-    const db = nativeAutostart === null || nativeAutostart === loaded.settings.autostart
+    const withAutostart = nativeAutostart === null || nativeAutostart === loaded.settings.autostart
       ? loaded
       : {
           ...loaded,
           settings: { ...loaded.settings, autostart: nativeAutostart }
         };
+    // 启动时修正历史数据中的序号空隙（例如删除后未重排的 1,2,4）
+    const db = normalizeTaskNumbers(withAutostart);
     if (db !== loaded) persist(db);
     set({
       db,
@@ -194,12 +215,18 @@ export const useAppStore = create<Store>((set, get) => ({
 
   deleteTask: (id) => set((state) => {
     const deletedTodoIds = todoIdsForTask(state.db, id);
-    const db = {
+    const nextTodoNo = { ...state.db.counters.next_todo_no };
+    delete nextTodoNo[id];
+    const db = normalizeTaskNumbers({
       ...state.db,
+      counters: {
+        ...state.db.counters,
+        next_todo_no: nextTodoNo
+      },
       tasks: state.db.tasks.filter((task) => task.id !== id),
       todos: state.db.todos.filter((todo) => todo.task_id !== id),
       issues: state.db.issues.filter((issue) => issue.task_id !== id)
-    };
+    });
     persist(db);
     return {
       db,

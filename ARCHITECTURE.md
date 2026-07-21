@@ -58,6 +58,12 @@ flowchart LR
 
 ## 5. 数据流
 
+### 项目序号规则
+
+- 新建项目时分配 `task_no = counters.next_task_no`，随后自增。
+- **删除项目后**，剩余项目按原序号升序重排为连续编号 `1..n`，并将 `next_task_no` 设为 `n + 1`，保证列表不出现空隙。
+- 项目列表默认按序号正序展示，可切换为正序 / 倒序。
+
 1. 应用启动时，前端通过 `load_database` 读取本地 JSON。
 2. 用户操作先更新 Zustand 内存状态。
 3. 状态变化通过 `save_database` 序列化到 Rust 后端。
